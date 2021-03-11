@@ -5,9 +5,12 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <android/log.h>
+#include <perfetto.h>
+#include <fcntl.h>
 #include "skyline/common.h"
 #include "skyline/common/signal.h"
 #include "skyline/common/settings.h"
+#include "skyline/common/tracing.h"
 #include "skyline/loader/loader.h"
 #include "skyline/os.h"
 #include "skyline/jvm.h"
@@ -36,6 +39,12 @@ extern "C" JNIEXPORT void Java_emu_skyline_EmulationActivity_executeApplication(
 
     auto start{std::chrono::steady_clock::now()};
 
+    // Initialize tracing
+    perfetto::TracingInitArgs args;
+    args.backends |= perfetto::kSystemBackend;
+    perfetto::Tracing::Initialize(args);
+    perfetto::TrackEvent::Register();
+
     try {
         auto os{std::make_shared<skyline::kernel::OS>(jvmManager, logger, settings, std::string(appFilesPath))};
         OsWeak = os;
@@ -56,6 +65,8 @@ extern "C" JNIEXPORT void Java_emu_skyline_EmulationActivity_executeApplication(
     } catch (...) {
         logger->Error("An unknown exception has occurred");
     }
+
+    perfetto::TrackEvent::Flush();
 
     InputWeak.reset();
 
